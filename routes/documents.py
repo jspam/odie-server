@@ -104,6 +104,7 @@ class DocumentLoadSchema(Schema):  # used by student document submission
     date = fields.Date(required=True)
     document_type = fields.Str(required=True, validate=OneOf(['oral', 'oral reexam']))
     student_name = fields.Str(required=False)
+    validated = fields.Boolean(required=False, missing=False)
 
 
 # temporary endpoint to make migration of math transcripts easier
@@ -170,6 +171,8 @@ def submit_document():
     file = request.files['file']
     if not _allowed_file(file.filename):
         raise ClientError('file extension not allowed', status=406)
+    if data['validated'] and not current_user.is_authenticated:
+        raise ClientError('only authenticated users can validate documents', status=401)
     lectures = []
     for lect in data['lectures']:
         try:
@@ -198,7 +201,7 @@ def submit_document():
             date=date,
             number_of_pages=0,  # this will be filled in upon validation
             document_type=data['document_type'],
-            validated=False,
+            validated=data['validated'],
             submitted_by=data['student_name'])
     sqla.session.add(new_doc)
 

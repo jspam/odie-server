@@ -337,6 +337,19 @@ class APITest(OdieTestCase):
                 }]
             }
 
+    SUBMITTED_VALIDATED_DOC_QUERY = {
+                'operator': 'and',
+                'value': [{
+                    'operator': '==',
+                    'column': 'validated',
+                    'value': True,
+                },{
+                    'operator': '==',
+                    'column': 'submitted_by',
+                    'value': UNUSED,
+                }]
+            }
+
     def _upload_document(self):
         with open(self.PDF_PATH, 'rb') as pdf:
             self.VALID_DOCUMENT_SUBMISSION['file'] = pdf
@@ -367,6 +380,44 @@ class APITest(OdieTestCase):
         # This field will only be populated if the upload succeeded and the PDF was successfully processed
         self.assertEqual(data[0]['number_of_pages'], 1)
         self.assertEqual(len(data[0]['lectures']), len(self.DOCUMENT_SUBMISSION_JSON['lectures']))
+        self.assertEqual(data[0]['validated'], False)
+
+    def test_validate_document_on_submission_unauthenticated(self):
+        submission_json = self.DOCUMENT_SUBMISSION_JSON.copy();
+        submission_json['validated'] = True
+        with open(self.PDF_PATH, 'rb') as pdf:
+            submission = {
+                'json': json.dumps(submission_json, separators=(',', ':')),
+                'file': pdf,
+            }
+            res = self.post('/api/documents', data=submission)
+            self.assertEqual(res.status_code, 401)
+
+            query = json.dumps(self.SUBMITTED_VALIDATED_DOC_QUERY, separators=(',', ':'))
+            res = self.get('/api/documents?q=%s' % query)
+            self.assertEqual(res.status_code, 200)
+            data = self.fromJsonResponse(res)
+            self.assertEqual(len(data), 0)
+
+    def test_validate_document_on_submission_authenticated(self):
+        self.login()
+
+        submission_json = self.DOCUMENT_SUBMISSION_JSON.copy();
+        submission_json['validated'] = True
+        with open(self.PDF_PATH, 'rb') as pdf:
+            submission = {
+                'json': json.dumps(submission_json, separators=(',', ':')),
+                'file': pdf,
+            }
+            res = self.post('/api/documents', data=submission)
+            self.assertEqual(res.status_code, 200)
+
+            query = json.dumps(self.SUBMITTED_VALIDATED_DOC_QUERY, separators=(',', ':'))
+            res = self.get('/api/documents?q=%s' % query)
+            self.assertEqual(res.status_code, 200)
+            data = self.fromJsonResponse(res)
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]['validated'], True)
 
     def test_no_document_preview_unauthenticated(self):
         self._upload_document()

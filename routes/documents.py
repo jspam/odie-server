@@ -158,6 +158,7 @@ def submit_document_external():
 # TODO: remove as soon as the migration is done
 @api_route('/api/documents_migration', methods=['POST'])
 @login_required
+@csrf.exempt
 def submit_document_migration():
     submit_documents(validate=True)
 
